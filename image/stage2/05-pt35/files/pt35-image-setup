@@ -1,0 +1,12 @@
+#!/bin/sh
+# userconfig has finished before this runs. Rebind greetd and the home config
+# to the account chosen in Raspberry Pi Imager / the first-boot wizard.
+set -eu
+user=$(getent passwd 1000 | cut -d: -f1)
+[ -n "$user" ] || { echo 'No first user (UID 1000)' >&2; exit 1; }
+# Never start the desktop as pi if first-boot user setup failed or was skipped.
+status=$(passwd -S "$user" | awk '{print $2}')
+[ "$status" = P ] || { echo "First user $user has no usable password; complete first-boot setup" >&2; exit 1; }
+PT35_USER="$user" /var/lib/dpkg/info/pt35-desktop.postinst configure
+install -d /var/lib/pt35
+touch /var/lib/pt35/image-configured

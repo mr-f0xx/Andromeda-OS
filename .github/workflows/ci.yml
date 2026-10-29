@@ -27,6 +27,8 @@ jobs:
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: cargo test --workspace
       - name: Shell scripts
-        run: shellcheck -S warning install.sh scripts/pt35-session scripts/pt35-hello scripts/pt35-cpu-profile scripts/pt35-ai scripts/pt35-quick scripts/pt35-probe.sh packaging/debian/postinst packaging/debian/prerm
+        run: shellcheck -S warning install.sh scripts/pt35-session scripts/pt35-hello scripts/pt35-cpu-profile scripts/pt35-ai scripts/pt35-quick scripts/pt35-probe.sh packaging/debian/postinst packaging/debian/prerm image/stage2/05-pt35/00-run.sh image/stage2/05-pt35/01-run-chroot.sh image/stage2/05-pt35/files/pt35-image-setup tests/image-setup.sh
+      - name: Image first-boot setup
+        run: tests/image-setup.sh
       - name: Overlay checksums
         run: cd boot && sha256sum -c SHA256SUMS
