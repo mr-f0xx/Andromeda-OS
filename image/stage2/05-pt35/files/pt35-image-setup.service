@@ -1,0 +1,13 @@
+[Unit]
+Description=Configure PT35 desktop for the first user
+After=userconfig.service
+Before=greetd.service
+ConditionPathExists=!/var/lib/pt35/image-configured
+
+[Service]
+Type=oneshot
+ExecStart=/usr/lib/pt35/pt35-image-setup
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

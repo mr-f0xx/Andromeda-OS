@@ -94,6 +94,34 @@ sudo reboot
 
 You log in straight to the desktop.
 
+### Flashable SD-card image
+
+The **Flashable image** GitHub Actions workflow builds a Raspberry Pi OS Trixie
+64-bit Lite image with pt35-desktop from the exact checkout being built. Run it
+from **Actions > Flashable image > Run workflow**, or push a `v*` tag. Download
+`pt35-desktop-trixie-arm64` from the completed run's artifacts (retained for
+14 days). The workflow does not publish the image to GitHub Releases. Verify
+`SHA256SUMS` after extracting the artifact, then select the `.img.xz` with
+Raspberry Pi Imager's **Use custom** and write it to an SD card. This erases
+the card; use at least 8 GB. The root filesystem expands on first boot.
+
+In Imager's OS customisation, **set a username and password** (and, optionally,
+Wi-Fi and its country). Do not override the image's login/desktop configuration.
+Alternatively, without Imager customisation, complete Raspberry Pi OS's
+first-boot user setup on the attached keyboard and screen. The image starts
+with a locked `pi` account, no shared password, and SSH disabled by default;
+first-boot setup creates/renames the account before the desktop starts. The
+desktop logs in automatically as that user, so anyone with physical access
+can use it. Set up SSH separately if needed. The workflow installs the desktop
+and common runtime packages, but does not install yazi, Nerd Fonts, or the
+optional AI models. Keyboard firmware is separate: flash it on the device as
+in step 2 above.
+
+The workflow uses native ARM64 runners and Raspberry Pi's pi-gen at a pinned
+revision, with live Trixie package repositories, so builds are not bit-for-bit
+reproducible. A successful workflow checks the image structure and contents;
+it is not a substitute for testing on a PocketTerm35.
+
 ### Update, remove, build
 
 | to | run |

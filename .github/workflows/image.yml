@@ -1,0 +1,97 @@
+name: Flashable image
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  image:
+    # pi-gen supports native builds. The image and its package must both be arm64.
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxkbcommon-dev pkg-config quilt parted qemu-user-binfmt \
+            debootstrap zerofree zip dosfstools e2fsprogs libcap2-bin rsync xz-utils \
+            file curl bc gpg pigz xxd arch-test bmap-tools kmod
+          cargo install cargo-deb --locked
+      - name: Build package from this revision
+        run: |
+          cargo build --release --workspace --locked
+          cargo deb -p pt35-desktop --no-build --output pt35-desktop_arm64.deb
+          test "$(dpkg-deb -f pt35-desktop_arm64.deb Architecture)" = arm64
+          (cd boot && sha256sum -c SHA256SUMS)
+      - name: Prepare Raspberry Pi OS image builder
+        run: |
+          git clone https://github.com/RPi-Distro/pi-gen.git "$RUNNER_TEMP/pi-gen"
+          git -C "$RUNNER_TEMP/pi-gen" checkout c851f00178c64b87a86c06c2be216bd89d62e55b
+          cp -a image/stage2/05-pt35 "$RUNNER_TEMP/pi-gen/stage2/"
+          cp pt35-desktop_arm64.deb "$RUNNER_TEMP/pi-gen/stage2/05-pt35/files/"
+          cat > "$RUNNER_TEMP/pi-gen/config" <<'CONFIG'
+          IMG_NAME=pt35-desktop
+          PI_GEN_RELEASE="pt35-desktop"
+          RELEASE=trixie
+          DEPLOY_COMPRESSION=xz
+          COMPRESSION_LEVEL=3
+          STAGE_LIST="stage0 stage1 stage2"
+          FIRST_USER_NAME=pi
+          ENABLE_SSH=0
+          ENABLE_CLOUD_INIT=0
+          CONFIG
+      - name: Build image
+        working-directory: ${{ runner.temp }}/pi-gen
+        run: sudo ./build.sh
+      - name: Smoke-test the generated image
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          images=("$RUNNER_TEMP"/pi-gen/work/pt35-desktop/export-image/*.img)
+          [ "${#images[@]}" -eq 1 ]
+          root="$RUNNER_TEMP/image-root"
+          mkdir -p "$root"
+          loop=$(sudo losetup --find --show --partscan "${images[0]}")
+          cleanup() {
+            sudo umount "$root/boot/firmware" 2>/dev/null || true
+            sudo umount "$root" 2>/dev/null || true
+            sudo losetup -d "$loop"
+          }
+          trap cleanup EXIT
+          sudo mount -o ro,noload "${loop}p2" "$root"
+          sudo mount -o ro "${loop}p1" "$root/boot/firmware"
+          sudo test -f "$root/boot/firmware/config.txt"
+          sudo test -f "$root/boot/firmware/overlays/waveshare-35dpi-5b.dtbo"
+          sudo grep -q 'dtoverlay=waveshare-35dpi-5b' "$root/boot/firmware/config.txt"
+          sudo test -x "$root/usr/bin/pt35-menu"
+          file "$root/usr/bin/pt35-menu" | grep -q 'ARM aarch64'
+          sudo grep -A2 '^Package: pt35-desktop$' "$root/var/lib/dpkg/status" | grep -q 'Status: install ok installed'
+          sudo test -L "$root/etc/systemd/system/multi-user.target.wants/userconfig.service"
+          sudo test -L "$root/etc/systemd/system/multi-user.target.wants/pt35-image-setup.service"
+          sudo test -f "$root/etc/systemd/system/greetd.service.d/image-setup.conf"
+          sudo grep -q '^pi:[!*]' "$root/etc/shadow"
+      - name: Validate and checksum image
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          images=("$RUNNER_TEMP"/pi-gen/deploy/*.img.xz)
+          [ "${#images[@]}" -eq 1 ]
+          mkdir -p image-output
+          sudo mv "${images[0]}" image-output/pt35-desktop-trixie-arm64.img.xz
+          sudo chown "$(id -u):$(id -g)" image-output/pt35-desktop-trixie-arm64.img.xz
+          xz -t image-output/pt35-desktop-trixie-arm64.img.xz
+          (cd image-output && sha256sum pt35-desktop-trixie-arm64.img.xz > SHA256SUMS)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pt35-desktop-trixie-arm64
+          path: image-output/*
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
