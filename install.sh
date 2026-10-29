@@ -179,7 +179,16 @@ install_from_source() {
         xdg-desktop-portal-wlr wl-clipboard grim wtype \
         fonts-dejavu-core papirus-icon-theme i2c-tools evtest python3-serial htop \
         qt5-gtk-platformtheme qt6-gtk-platformtheme fastfetch bibata-cursor-theme ncdu \
+        chromium locales \
         build-essential pkg-config libxkbcommon-dev"
+
+  # Make the French UTF-8 locale available to the user and applications.
+  if ! grep -qE '^#?fr_FR.UTF-8 UTF-8$' /etc/locale.gen; then
+    echo 'fr_FR.UTF-8 UTF-8' >> /etc/locale.gen
+  else
+    sed -i 's/^#fr_FR.UTF-8 UTF-8$/fr_FR.UTF-8 UTF-8/' /etc/locale.gen
+  fi
+  run "locale-gen fr_FR.UTF-8"
 
   # A login shell, so a rustup toolchain in ~/.cargo/bin wins over the older
   # /usr/bin/cargo that Debian ships (Trixie's 1.85 is too old for wayland-protocols).

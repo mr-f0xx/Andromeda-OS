@@ -3,29 +3,28 @@
 # Settings > Appearance writes ~/.config/pt35/appearance.toml, which sits
 # between the two: a hand edit in theme.toml still wins over a pick.
 #
-# Mint on charcoal. Terminal green without the neon: a saturated #00ff88 buzzes
-# on an emissive panel this small, so the accent is toned down and the text is
-# off-white with a green cast. The panel is 3.5" at 640x480, about 9 px/mm, so a
-# 50px row is ~5.5mm: readable at arm's length, hittable with a thumb.
+# Amber on black: a restrained phosphor-inspired palette with high contrast
+# for the 3.5" 640x480 panel. A 50px row is ~5.5mm: readable at arm's length,
+# hittable with a thumb.
 
 [color]
-background      = "#0a1310"
-background_alt  = "#121f1a"
-foreground      = "#dcf3e5"
-muted           = "#7aa48e"
-accent          = "#3ddc97"
-accent_fg       = "#06130d"
-warning         = "#e8c468"
-critical        = "#ef6b73"
-ok              = "#3ddc97"
-border          = "#254236"
+background      = "#000000"
+background_alt  = "#171108"
+foreground      = "#ffd36a"
+muted           = "#a8843e"
+accent          = "#ffb000"
+accent_fg       = "#100b00"
+warning         = "#ffd166"
+critical        = "#ff6b5e"
+ok              = "#ffb000"
+border          = "#59400e"
 
 # Face-button pills in the hint bar, matching the physical buttons.
-button_a        = "#3ddc97"
-button_b        = "#ef6b73"
-button_x        = "#5fd0e8"
-button_y        = "#e8c468"
-button_neutral  = "#254236"
+button_a        = "#ffb000"
+button_b        = "#ff6b5e"
+button_x        = "#e8bd62"
+button_y        = "#ffd166"
+button_neutral  = "#59400e"
 
 [font]
 family          = "DejaVu Sans"
