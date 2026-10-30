@@ -8,5 +8,10 @@ user=$(getent passwd 1000 | cut -d: -f1)
 status=$(passwd -S "$user" | awk '{print $2}')
 [ "$status" = P ] || { echo "First user $user has no usable password; complete first-boot setup" >&2; exit 1; }
 PT35_USER="$user" /var/lib/dpkg/info/pt35-desktop.postinst configure
+# The AI payload is already on disk. Size its agents for the target board and
+# write them to the final user, not the temporary pi account used by pi-gen.
+if [ -f /var/lib/pt35-ai/target-ram ]; then
+  PT35_USER="$user" /usr/bin/pt35-ai image-configure
+fi
 install -d /var/lib/pt35
 touch /var/lib/pt35/image-configured

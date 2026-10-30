@@ -86,7 +86,20 @@ model_info() {
   esac
 }
 
-ram_mb() { awk '/^MemTotal:/ { print int($2 / 1024) }' /proc/meminfo; }
+# An image is built on a runner, not on the Pi it is for. image-provision
+# records the target RAM so its context is not sized from the build host.
+ram_mb() {
+  local ram="${PT35_IMAGE_RAM_MB:-}"
+  if [ -z "$ram" ] && [ -f "$STATE/target-ram" ]; then
+    read -r ram < "$STATE/target-ram"
+  fi
+  if [ -n "$ram" ]; then
+    [[ "$ram" =~ ^[1-9][0-9]*$ ]] || die "invalid target RAM: $ram"
+    printf '%s\n' "$ram"
+  else
+    awk '/^MemTotal:/ { print int($2 / 1024) }' /proc/meminfo
+  fi
+}
 
 # MemTotal reads below the label: a 4 GB board shows about 3.7 GB.
 # install.sh asks the same question with the same limits.
@@ -319,6 +332,61 @@ cmd_setup() {
   msg "ready. Open DarkWire in the launcher"
 }
 
+# Bake the runtime, model and client into an OS image. Run in its chroot as
+# root: do not start services or configure the build user's home. The target
+# RAM is supplied by the image recipe, never inferred from the build runner.
+cmd_image_provision() {
+  need_root image-provision
+  local id="${1:?which model? one of: $MODEL_IDS}"
+  local ram="${PT35_IMAGE_RAM_MB:-}"
+  [[ "$ram" =~ ^[1-9][0-9]*$ ]] || die "set PT35_IMAGE_RAM_MB to the target board's RAM in MB"
+  model_info "$id" || die "unknown model '$id'; one of: $MODEL_IDS"
+  install_runtime
+  fetch_model "$id"
+  install_agent
+  install -d "$STATE"
+  printf '%s\n' "$ram" > "$STATE/target-ram"
+  chmod 644 "$STATE/target-ram"
+  printf '%s\n' "$id" > "$DEFAULT"
+  chmod 644 "$DEFAULT"
+  write_config
+  {
+    printf 'model: %s\nmodel_file: %s\nmodel_sha256: %s\n' "$id" "$M_FILE" "$M_SHA256"
+    printf 'target_ram_mb: %s\ncontext_tokens: %s\n' "$ram" "$(model_ctx)"
+    printf 'llama_cpp: %s\nllama_swap: %s\n' "$LLAMA_CPP_TAG" "$LLAMA_SWAP_VERSION"
+    printf 'darkwire: '
+    /usr/local/bin/darkwire --version
+    printf 'darkwire_sha256: '
+    sha256sum /usr/local/bin/darkwire | cut -d' ' -f1
+  } > "$STATE/image-manifest"
+  chmod 644 "$STATE/image-manifest"
+  systemctl enable "$SERVICE"
+  msg "$M_LABEL baked in for a $ram MB board; agents are configured on first boot"
+}
+
+# Run after pi-gen's userconfig/rename-user, before the desktop starts. All
+# downloads are already in the image. Fail before the first-boot completion
+# marker if the service or the chosen user's agent configuration is broken.
+cmd_image_configure() {
+  need_root image-configure
+  local id user
+  id=$(default_model)
+  model_info "$id" || die "the image has no valid default model"
+  installed "$id" || die "the image is missing $M_FILE"
+  [ -x "$PREFIX/llama.cpp/llama-server" ] || die "the image has no llama-server"
+  [ -x "$PREFIX/bin/llama-swap" ] || die "the image has no llama-swap"
+  [ -x /usr/local/bin/darkwire ] || die "the image has no darkwire"
+  ram_mb >/dev/null
+  set_default "$id"
+  curl -fsS --retry 30 --retry-connrefused --retry-delay 1 --max-time 2 \
+    -o /dev/null "http://$LISTEN/v1/models" \
+    || die "the model server did not start: journalctl -u $SERVICE"
+  user=$(desktop_user)
+  [ -n "$user" ] || die "no desktop user for the image's agents"
+  runuser -u "$user" -- "$0" agents || die "could not configure agents for $user"
+  msg "local AI ready for $user: $M_LABEL, $(model_ctx) tokens of context"
+}
+
 cmd_model() {
   need_root model
   local id="${1:?which model? one of: $MODEL_IDS}"
@@ -431,14 +499,19 @@ usage() {
   exit "${1:-0}"
 }
 
-case "${1:-}" in
-  agents) shift; cmd_agents "$@" ;;
-  models) cmd_models ;;
-  status) cmd_status ;;
-  setup) shift; cmd_setup "$@" ;;
-  model) shift; cmd_model "$@" ;;
-  agent) need_root agent; install -d "$STATE"; install_agent; [ -z "$(default_model)" ] || sync_agents ;;
-  remove) cmd_remove ;;
-  -h|--help|help|"") usage ;;
-  *) usage 1 >&2 ;;
-esac
+# Sourcing is for the image tests; executing the file is the CLI.
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  case "${1:-}" in
+    agents) shift; cmd_agents "$@" ;;
+    models) cmd_models ;;
+    status) cmd_status ;;
+    setup) shift; cmd_setup "$@" ;;
+    image-provision) shift; cmd_image_provision "$@" ;;
+    image-configure) cmd_image_configure ;;
+    model) shift; cmd_model "$@" ;;
+    agent) need_root agent; install -d "$STATE"; install_agent; [ -z "$(default_model)" ] || sync_agents ;;
+    remove) cmd_remove ;;
+    -h|--help|help|"") usage ;;
+    *) usage 1 >&2 ;;
+  esac
+fi

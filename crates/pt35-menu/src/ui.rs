@@ -833,9 +833,15 @@ impl Menu {
             .collect();
         let mut x = pad;
         let start = x;
-        x = self
-            .mono
-            .draw_tracked(canvas, "Andromeda OS", x, baseline, size, theme.color.accent, track);
+        x = self.mono.draw_tracked(
+            canvas,
+            "Andromeda OS",
+            x,
+            baseline,
+            size,
+            theme.color.accent,
+            track,
+        );
         if trail.len() > 1 {
             self.crumb_hits.push((start - 4, x + 4, 1));
         }

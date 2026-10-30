@@ -14,3 +14,7 @@ locale-gen fr_FR.UTF-8
 # graphical target here: pi-gen's user-rename setup must see a Lite/CLI image.
 systemctl enable NetworkManager.service seatd.service keyd.service greetd.service pt35-image-setup.service
 systemctl disable ssh.service
+# Installer option 1, baked in rather than downloaded on the handheld. The
+# builder's RAM is irrelevant: this image is for a 4 GB Raspberry Pi 4.
+# Services stay stopped in the chroot; pt35-image-setup configures the user.
+PT35_IMAGE_RAM_MB=4096 pt35-ai image-provision minicpm5-2b

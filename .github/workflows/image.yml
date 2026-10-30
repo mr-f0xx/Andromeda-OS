@@ -16,14 +16,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
       - name: Install build dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y libxkbcommon-dev pkg-config quilt parted qemu-user-binfmt \
             debootstrap zerofree zip dosfstools e2fsprogs libcap2-bin rsync xz-utils \
-            file curl bc gpg pigz xxd arch-test bmap-tools kmod
+            file curl bc gpg pigz xxd arch-test bmap-tools kmod shellcheck python3-yaml
           cargo install cargo-deb --locked
+      - name: Check this revision
+        run: |
+          cargo fmt --all --check
+          cargo clippy --workspace --all-targets -- -D warnings
+          cargo test --workspace --locked
+          shellcheck -S warning scripts/pt35-ai \
+            image/stage2/05-pt35/00-run.sh image/stage2/05-pt35/01-run-chroot.sh \
+            image/stage2/05-pt35/files/pt35-image-setup tests/image-setup.sh tests/ai-image.sh
+          tests/image-setup.sh
+          tests/ai-image.sh
       - name: Build package from this revision
         run: |
           cargo build --release --workspace --locked
@@ -36,9 +48,20 @@ jobs:
           git -C "$RUNNER_TEMP/pi-gen" checkout c851f00178c64b87a86c06c2be216bd89d62e55b
           cp -a image/stage2/05-pt35 "$RUNNER_TEMP/pi-gen/stage2/"
           cp pt35-desktop_arm64.deb "$RUNNER_TEMP/pi-gen/stage2/05-pt35/files/"
+          cat > "$RUNNER_TEMP/pi-gen/stage2/05-pt35/files/image-build-info" <<EOF
+          Andromeda OS — Raspberry Pi 4B, 4 GB, local AI option 1
+          Source: $GITHUB_REPOSITORY@$GITHUB_SHA
+          Build: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
+          Base: Raspberry Pi OS Trixie arm64 Lite
+          Model: MiniCPM5 2B Q4_0 (minicpm5-2b)
+          Target RAM: 4096 MB
+          Context: 16384 tokens, f16 KV cache
+          AI runtime and model are included; no model download is needed on first boot.
+          EOF
           cat > "$RUNNER_TEMP/pi-gen/config" <<'CONFIG'
-          IMG_NAME=pt35-desktop
-          PI_GEN_RELEASE="pt35-desktop"
+          IMG_NAME=andromeda-os-pi4-4gb-ai
+          PI_GEN_RELEASE="Andromeda OS"
+          TARGET_HOSTNAME=andromeda
           RELEASE=trixie
           DEPLOY_COMPRESSION=xz
           COMPRESSION_LEVEL=3
@@ -49,15 +72,17 @@ jobs:
           CONFIG
       - name: Build image
         working-directory: ${{ runner.temp }}/pi-gen
-        run: sudo ./build.sh
+        run: |
+          df -h .
+          sudo ./build.sh
       - name: Smoke-test the generated image
         run: |
           set -euo pipefail
           shopt -s nullglob
-          images=("$RUNNER_TEMP"/pi-gen/work/pt35-desktop/export-image/*.img)
+          images=("$RUNNER_TEMP"/pi-gen/work/andromeda-os-pi4-4gb-ai/export-image/*.img)
           [ "${#images[@]}" -eq 1 ]
           root="$RUNNER_TEMP/image-root"
-          mkdir -p "$root"
+          mkdir -p "$root" image-output
           loop=$(sudo losetup --find --show --partscan "${images[0]}")
           cleanup() {
             sudo umount "$root/boot/firmware" 2>/dev/null || true
@@ -68,29 +93,67 @@ jobs:
           sudo mount -o ro,noload "${loop}p2" "$root"
           sudo mount -o ro "${loop}p1" "$root/boot/firmware"
           sudo test -f "$root/boot/firmware/config.txt"
+          sudo test -f "$root/boot/firmware/kernel8.img"
+          sudo grep -q '^arm_64bit=1' "$root/boot/firmware/config.txt"
+          # Waveshare's 5b overlay has the GT911 address used by PocketTerm35;
+          # despite its name it is also the correct overlay on the Pi 4B.
           sudo test -f "$root/boot/firmware/overlays/waveshare-35dpi-5b.dtbo"
           sudo grep -q 'dtoverlay=waveshare-35dpi-5b' "$root/boot/firmware/config.txt"
+          sudo grep -q 'dtoverlay=dwc2,dr_mode=host' "$root/boot/firmware/config.txt"
           sudo test -x "$root/usr/bin/pt35-menu"
           file "$root/usr/bin/pt35-menu" | grep -q 'ARM aarch64'
           sudo grep -A2 '^Package: pt35-desktop$' "$root/var/lib/dpkg/status" | grep -q 'Status: install ok installed'
+          sudo grep -q 'Andromeda OS' "$root/usr/bin/pt35-menu"
+          sudo grep -q '^foreground=ffd36a$' "$root/usr/share/pt35-desktop/foot/foot.ini"
           sudo test -L "$root/etc/systemd/system/multi-user.target.wants/userconfig.service"
           sudo test -L "$root/etc/systemd/system/multi-user.target.wants/pt35-image-setup.service"
+          sudo test -L "$root/etc/systemd/system/multi-user.target.wants/pt35-ai.service"
           sudo test -f "$root/etc/systemd/system/greetd.service.d/image-setup.conf"
           sudo grep -q '^pi:[!*]' "$root/etc/shadow"
+          # Option 1 must actually be present, not merely offered by the launcher.
+          test "$(sudo cat "$root/var/lib/pt35-ai/default")" = minicpm5-2b
+          test "$(sudo cat "$root/var/lib/pt35-ai/target-ram")" = 4096
+          model="$root/var/lib/pt35-ai/models/MiniCPM5-2B-Q4_0.gguf"
+          sudo test -f "$model"
+          test "$(sudo stat -c %s "$model")" -eq 1516997856
+          echo "5f6870f31c6d8bb814865cceb5ed01c4945006e1477622c6426b10c31d477d10  $model" | sudo sha256sum -c -
+          for binary in "$root/opt/pt35-ai/llama.cpp/llama-server" "$root/opt/pt35-ai/bin/llama-swap" "$root/usr/local/bin/darkwire"; do
+            sudo test -x "$binary"
+            file "$binary" | grep -q 'ARM aarch64'
+          done
+          sudo grep -q -- '--ctx-size 16384' "$root/var/lib/pt35-ai/llama-swap.yaml"
+          sudo grep -q -- '--cache-type-k f16' "$root/var/lib/pt35-ai/llama-swap.yaml"
+          sudo grep -q -- '--host 127.0.0.1' "$root/var/lib/pt35-ai/llama-swap.yaml"
+          sudo test -f "$root/usr/share/pt35-desktop/ai/darkwire-agents.yaml"
+          sudo test ! -e "$root/var/lib/pt35/image-configured"
+          sudo cp "$root/var/lib/pt35-ai/image-manifest" image-output/AI-BUILD-INFO.txt
+          sudo cp "$root/usr/share/pt35-desktop/image-build-info" image-output/BUILD-INFO.txt
+          sudo chown -R "$(id -u):$(id -g)" image-output
       - name: Validate and checksum image
         run: |
           set -euo pipefail
           shopt -s nullglob
           images=("$RUNNER_TEMP"/pi-gen/deploy/*.img.xz)
           [ "${#images[@]}" -eq 1 ]
-          mkdir -p image-output
-          sudo mv "${images[0]}" image-output/pt35-desktop-trixie-arm64.img.xz
-          sudo chown "$(id -u):$(id -g)" image-output/pt35-desktop-trixie-arm64.img.xz
-          xz -t image-output/pt35-desktop-trixie-arm64.img.xz
-          (cd image-output && sha256sum pt35-desktop-trixie-arm64.img.xz > SHA256SUMS)
+          name=andromeda-os-pi4-4gb-ai-trixie-arm64.img.xz
+          sudo mv "${images[0]}" "image-output/$name"
+          sudo chown "$(id -u):$(id -g)" "image-output/$name"
+          xz -t "image-output/$name"
+          (cd image-output && sha256sum "$name" > SHA256SUMS)
+          checksum=$(cut -d' ' -f1 image-output/SHA256SUMS)
+          echo "::notice title=Image SHA256::$checksum"
+          {
+            echo '## Andromeda OS — Pi 4B / 4 GB / AI option 1'
+            echo
+            echo "- Image: \`$name\`"
+            echo "- SHA256: \`$checksum\`"
+            echo '- Local model: MiniCPM5 2B Q4_0, 16k context'
+            echo '- Download the artifact, extract it, verify SHA256SUMS, then flash the .img.xz with Raspberry Pi Imager (Use custom).'
+            echo '- Set your username/password in Imager. Keyboard firmware is a separate on-device step: sudo pt35-kbd flash.'
+          } >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         with:
-          name: pt35-desktop-trixie-arm64
+          name: andromeda-os-pi4-4gb-ai-trixie-arm64
           path: image-output/*
           if-no-files-found: error
           compression-level: 0
