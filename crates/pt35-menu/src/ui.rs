@@ -823,7 +823,7 @@ impl Menu {
         let baseline = (height as f32 * 0.64) as i32;
         let size = theme.font.size_title;
         self.crumb_hits.clear();
-        // The path is the way back: PT35 is the top screen, and each screen
+        // The path is the way back: Andromeda OS is the top screen, and each screen
         // on the way is a link to itself. Only the one in front is plain.
         let trail: Vec<String> = self
             .model
@@ -835,7 +835,7 @@ impl Menu {
         let start = x;
         x = self
             .mono
-            .draw_tracked(canvas, "PT35", x, baseline, size, theme.color.accent, track);
+            .draw_tracked(canvas, "Andromeda OS", x, baseline, size, theme.color.accent, track);
         if trail.len() > 1 {
             self.crumb_hits.push((start - 4, x + 4, 1));
         }
