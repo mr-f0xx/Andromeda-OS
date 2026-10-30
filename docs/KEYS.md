@@ -56,7 +56,7 @@ The menu works like any desktop, in either mode, with a plugged-in mouse too.
 | right click | the row's menu: Open and Pin on an app, Switch to, Close and Close all on a window |
 | wheel | scrolls |
 | scrollbar | click to jump, drag to move |
-| header | `PT35 < SETTINGS < SYSTEM`: click a name to go back to it |
+| header | `Andromeda OS < SETTINGS < SYSTEM`: click a name to go back to it |
 
 Touch works the same way: tap a row, a tile or a legend pill.
 
