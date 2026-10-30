@@ -1529,7 +1529,10 @@ mod provider_tests {
     fn amber_crt_palette_restores_the_shipped_shell_colours() {
         let shipped: toml::Value =
             toml::from_str(include_str!("../../../config/pt35/theme.toml")).unwrap();
-        let (_, colours) = PALETTES.iter().find(|(name, _)| *name == "Amber CRT").unwrap();
+        let (_, colours) = PALETTES
+            .iter()
+            .find(|(name, _)| *name == "Amber CRT")
+            .unwrap();
         // Compare all 15 keys, not just the background used by the active marker.
         for (key, value) in *colours {
             assert_eq!(shipped["color"][*key].as_str(), Some(*value), "{key}");
