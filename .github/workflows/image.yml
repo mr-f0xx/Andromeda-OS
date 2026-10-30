@@ -3,7 +3,6 @@ name: Flashable image
 on:
   workflow_dispatch:
   push:
-    branches: [arena/a749535c-andromeda-os]
     tags: ["v*"]
 
 

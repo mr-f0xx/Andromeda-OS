@@ -3,6 +3,19 @@
 This is a bootable Raspberry Pi OS image, not a replacement for the Pi's
 bootloader or the PocketTerm35's RP2040 keyboard firmware.
 
+## Built image
+
+- **Download:** [andromeda-os-pi4-4gb-ai-trixie-arm64 artifact](https://github.com/mr-f0xx/Andromeda-OS/actions/runs/40983473499/artifacts/12946407563)
+- **Build run:** [Flashable image #40983473499](https://github.com/mr-f0xx/Andromeda-OS/actions/runs/40983473499) — successful
+- **Firmware payload source:** `9b06e9bf2584f895865b99065d006a3112655932`
+- **Artifact size:** 2,526,720,742 bytes (about 2.35 GiB)
+- **Image file after extraction:** `andromeda-os-pi4-4gb-ai-trixie-arm64.img.xz`
+- **SHA256:** `518c299ae9320a09c9dd471fcf0a4e3f6df1c6ec0fe91e2c0d9e63d14e72d122`
+- **Artifact retention:** 14 days from the build (approximately 2026-11-13).
+
+GitHub may require you to sign in to download Actions artifacts. The artifact
+also contains `SHA256SUMS`, `BUILD-INFO.txt` and `AI-BUILD-INFO.txt`.
+
 ## Included
 
 - Andromeda OS header and amber CRT foot terminal theme from the build revision.
