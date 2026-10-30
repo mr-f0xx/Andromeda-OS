@@ -5,7 +5,7 @@ on:
   push:
     branches: [arena/a749535c-andromeda-os]
     tags: ["v*"]
-    paths-ignore: [".github/workflows/image.yml"]
+
 
 permissions:
   contents: read
@@ -28,11 +28,14 @@ jobs:
             debootstrap zerofree zip dosfstools e2fsprogs libcap2-bin rsync xz-utils \
             file curl bc gpg pigz xxd arch-test bmap-tools kmod shellcheck python3-yaml
           cargo install cargo-deb --locked
-      - name: Check this revision
+      - name: Rust formatting
+        run: cargo fmt --all --check
+      - name: Rust lint
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Rust tests
+        run: cargo test --workspace --locked
+      - name: Shell and image configuration tests
         run: |
-          cargo fmt --all --check
-          cargo clippy --workspace --all-targets -- -D warnings
-          cargo test --workspace --locked
           shellcheck -S warning scripts/pt35-ai \
             image/stage2/05-pt35/00-run.sh image/stage2/05-pt35/01-run-chroot.sh \
             image/stage2/05-pt35/files/pt35-image-setup tests/image-setup.sh tests/ai-image.sh
