@@ -29,14 +29,7 @@ jobs:
             file curl bc gpg pigz xxd arch-test bmap-tools kmod shellcheck python3-yaml
           cargo install cargo-deb --locked
       - name: Rust formatting
-        run: |
-          if ! cargo fmt --all --check; then
-            cargo fmt --all
-            git diff --no-ext-diff | while IFS= read -r line; do
-              printf '::error::%s\n' "$line"
-            done
-            exit 1
-          fi
+        run: cargo fmt --all --check
       - name: Rust lint
         run: cargo clippy --workspace --all-targets -- -D warnings
       - name: Rust tests

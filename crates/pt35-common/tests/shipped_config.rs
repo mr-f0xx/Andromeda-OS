@@ -45,7 +45,11 @@ fn foot_amber_theme_is_complete_and_readable() {
         }
     }
     let get = |key: &str| -> Rgb {
-        colours.get(key).unwrap_or_else(|| panic!("missing {key}")).parse().unwrap()
+        colours
+            .get(key)
+            .unwrap_or_else(|| panic!("missing {key}"))
+            .parse()
+            .unwrap()
     };
     let theme: Theme = load("theme.toml");
     assert_eq!(get("background"), theme.color.background);
