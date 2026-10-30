@@ -28,6 +28,44 @@ fn shipped_theme_parses() {
 }
 
 #[test]
+fn foot_amber_theme_is_complete_and_readable() {
+    use pt35_common::theme::Rgb;
+    use std::collections::HashMap;
+
+    let text = include_str!("../../../config/foot/foot.ini");
+    let mut section = "";
+    let mut colours = HashMap::new();
+    for line in text.lines().map(str::trim) {
+        if let Some(name) = line.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
+            section = name;
+        } else if section == "colors" && !line.starts_with('#') {
+            if let Some((key, value)) = line.split_once('=') {
+                colours.insert(key, value);
+            }
+        }
+    }
+    let get = |key: &str| -> Rgb {
+        colours.get(key).unwrap_or_else(|| panic!("missing {key}")).parse().unwrap()
+    };
+    let theme: Theme = load("theme.toml");
+    assert_eq!(get("background"), theme.color.background);
+    assert_eq!(get("foreground"), theme.color.foreground);
+    for prefix in ["regular", "bright"] {
+        for i in 0..8 {
+            let color = get(&format!("{prefix}{i}"));
+            // ANSI black is intentionally dark; all other text must be legible.
+            if prefix != "regular" || i != 0 {
+                let ratio = (color.luminance() + 0.05) / (get("background").luminance() + 0.05);
+                assert!(ratio >= 4.5, "{prefix}{i}: {ratio:.1}:1");
+            }
+        }
+    }
+    let fg = get("selection-foreground").luminance();
+    let bg = get("selection-background").luminance();
+    assert!((fg.max(bg) + 0.05) / (fg.min(bg) + 0.05) >= 4.5);
+}
+
+#[test]
 fn shipped_menu_validates() {
     let tree: MenuTree = load("menu.toml");
     tree.validate().expect("shipped menu.toml is inconsistent");
