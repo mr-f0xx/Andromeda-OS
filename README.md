@@ -38,7 +38,7 @@ menu you drive with the D-pad. A mouse works too, built in or plugged in.
 </tr>
 <tr>
 <td align="center">Right click a row for more</td>
-<td align="center">Six colour palettes, applied to GTK and Qt apps too</td>
+<td align="center">Seven shell colour palettes, with GTK and Qt app settings</td>
 </tr>
 </table>
 
@@ -246,7 +246,17 @@ Defaults live in `/usr/share/pt35-desktop/pt35/`. Put your own copy in
 | `theme.toml` | colours, fonts, sizes, icons |
 | `hooks/hook_*` | scripts run at startup, app launch, shutdown |
 
-Settings > Appearance writes `~/.config/pt35/appearance.toml` for you.
+Settings > Appearance writes `~/.config/pt35/appearance.toml` for you. Select
+**Amber CRT palette** there to restore the amber-on-black shell colours.
+
+The default foot terminal uses a matching amber CRT-inspired colour palette and
+block cursor. It is a colour theme only, without scanlines or flicker. Foot's
+colours are independent of the shell's Appearance setting. New installations get
+the theme automatically; upgrades keep an existing `~/.config/foot/foot.ini`.
+To apply the new default on an existing installation, back up your foot config,
+then copy `/usr/share/pt35-desktop/foot/foot.ini` to
+`~/.config/foot/foot.ini` and open a new terminal. You can edit that file to
+customize the palette.
 
 An app that is too big for 640x480 gets `scale = 0.75` in `apps.toml`. The app
 draws smaller. The desktop does not.

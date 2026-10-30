@@ -1151,6 +1151,13 @@ pub const ACCENTS: &[(&str, &str)] = &[
 /// pill.
 pub const PALETTES: &[(&str, &[(&str, &str)])] = &[
     (
+        "Amber CRT",
+        &palette([
+            "#000000", "#171108", "#ffd36a", "#a8843e", "#ffb000", "#100b00", "#ffd166", "#ff6b5e",
+            "#ffb000", "#59400e", "#ffb000", "#ff6b5e", "#e8bd62", "#ffd166", "#59400e",
+        ]),
+    ),
+    (
         "Mint",
         &palette([
             "#0a1310", "#121f1a", "#dcf3e5", "#7aa48e", "#3ddc97", "#06130d", "#e8c468", "#ef6b73",
@@ -1515,6 +1522,17 @@ mod provider_tests {
                 let ratio = (a.max(b) + 0.05) / (a.min(b) + 0.05);
                 assert!(ratio >= 4.5, "{name}: {fg} on {bg} is {ratio:.1}:1");
             }
+        }
+    }
+
+    #[test]
+    fn amber_crt_palette_restores_the_shipped_shell_colours() {
+        let shipped: toml::Value =
+            toml::from_str(include_str!("../../../config/pt35/theme.toml")).unwrap();
+        let (_, colours) = PALETTES.iter().find(|(name, _)| *name == "Amber CRT").unwrap();
+        // Compare all 15 keys, not just the background used by the active marker.
+        for (key, value) in *colours {
+            assert_eq!(shipped["color"][*key].as_str(), Some(*value), "{key}");
         }
     }
 
